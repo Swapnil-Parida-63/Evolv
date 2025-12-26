@@ -1,2 +1,2 @@
 # Evolv
-AI SaaS project
+AI project
