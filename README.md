@@ -1,2 +1,2 @@
 # Evolv
-AI project
+AI powered student industry interface
