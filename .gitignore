@@ -1,2 +1,7 @@
-.env
 node_modules
+.env
+dist
+build
+.DS_Store
+*.pem
+uploads
