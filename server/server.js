@@ -124,11 +124,9 @@ app.post('/api/auth/avatar', avatarUpload.single('avatar'), async (req, res) => 
     }
 });
 
-app.get('/', (req, res) => res.send('Evolv API is running...'));
-
 // ─── Serve React build in production ─────────────────────────────────────────
-// Build the frontend first: cd client && npm run build
-// Then everything — API + UI — runs from this single Express server on port 5000.
+// MUST be registered before the dev-only '/' text route so Express serves
+// index.html instead of the plain-text fallback.
 if (process.env.NODE_ENV === 'production') {
     const clientDist = path.join(__dirname, '..', 'client', 'dist');
     app.use(express.static(clientDist));
@@ -138,6 +136,9 @@ if (process.env.NODE_ENV === 'production') {
             res.sendFile(path.join(clientDist, 'index.html'));
         }
     });
+} else {
+    // Dev-only health check
+    app.get('/', (req, res) => res.send('Evolv API is running...'));
 }
 
 
