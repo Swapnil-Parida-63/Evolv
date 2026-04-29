@@ -3,7 +3,6 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import multer from 'multer';
-import multerS3 from 'multer-s3';
 import path from 'path';
 import session from 'express-session';
 import { fileURLToPath } from 'url';
@@ -22,17 +21,11 @@ import userRoutes from './routes/userRoutes.js';
 import passport from './config/passport.js';
 import User from './models/User.js';
 import jwt from 'jsonwebtoken';
-import s3, { BUCKET } from './config/s3.js';
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Ensure upload directories exist
-['uploads/social', 'uploads/resumes', 'uploads/avatars'].forEach(dir => {
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-});
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -68,17 +61,9 @@ app.use('/api/users', userRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ─── Profile & Avatar routes ───────────────────────────────────────────────────
-// Avatar upload → S3 under "avatars/<userId>/" prefix
+// Avatar upload → memory storage, saved as base64 data URL in MongoDB
 const avatarUpload = multer({
-    storage: multerS3({
-        s3,
-        bucket: BUCKET,
-        key: (req, file, cb) => {
-            const ext = path.extname(file.originalname);
-            cb(null, `avatars/${req.user?._id || 'unknown'}/${Date.now()}${ext}`);
-        },
-        contentType: multerS3.AUTO_CONTENT_TYPE,
-    }),
+    storage: multer.memoryStorage(),
     limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
 });
 
@@ -113,8 +98,10 @@ app.post('/api/auth/avatar', avatarUpload.single('avatar'), async (req, res) => 
         const user = await User.findById(decoded.id);
         if (!user) return res.status(404).json({ message: 'User not found' });
         if (req.file) {
-            // multer-s3 puts the public URL in file.location
-            user.avatar = req.file.location;
+            // Convert uploaded file to base64 data URL and store in MongoDB
+            const base64 = req.file.buffer.toString('base64');
+            const dataUrl = `data:${req.file.mimetype};base64,${base64}`;
+            user.avatar = dataUrl;
             await user.save();
         }
         res.json({ avatar: user.avatar });
@@ -125,9 +112,8 @@ app.post('/api/auth/avatar', avatarUpload.single('avatar'), async (req, res) => 
 });
 
 // ─── Serve React build in production ─────────────────────────────────────────
-// MUST be registered before the dev-only '/' text route so Express serves
-// index.html instead of the plain-text fallback.
-if (process.env.NODE_ENV === 'production') {
+// In Vercel, the client is served separately — this is for local dev fallback
+if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
     const clientDist = path.join(__dirname, '..', 'client', 'dist');
     app.use(express.static(clientDist));
     // SPA fallback — send index.html for any non-API route
@@ -173,6 +159,12 @@ if (process.env.MONGO_URI) {
     console.warn('MONGO_URI not found in environment variables');
 }
 
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+// Only listen when running locally (not on Vercel)
+if (!process.env.VERCEL) {
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+    });
+}
+
+// Export for Vercel serverless
+export default app;

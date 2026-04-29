@@ -1,9 +1,7 @@
 import express from 'express';
 import multer from 'multer';
-import multerS3 from 'multer-s3';
 import crypto from 'crypto';
-import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import s3, { BUCKET } from '../config/s3.js';
+// AWS S3 imports removed — no longer using S3 for file storage
 import Resume from '../models/Resume.js';
 import ActivityLog from '../models/ActivityLog.js';
 import { extractText } from '../utils/extractText.js';
@@ -12,8 +10,7 @@ import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Use memory storage so we can extract text from the buffer,
-// then manually push the file to S3.
+// Use memory storage so we can extract text from the buffer
 const resumeUpload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
@@ -26,19 +23,6 @@ const resumeUpload = multer({
         }
     }
 });
-
-// Helper — push a buffer to S3 and return the public URL + key
-const uploadBufferToS3 = async (buffer, mimetype, originalName, userId) => {
-    const key = `resumes/${userId}/${Date.now()}-${originalName.replace(/\s+/g, '_')}`;
-    await s3.send(new PutObjectCommand({
-        Bucket: BUCKET,
-        Key: key,
-        Body: buffer,
-        ContentType: mimetype,
-    }));
-    const url = `https://${BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
-    return { key, url };
-};
 
 // ─── POST /api/resume/upload ─────────────────────────────────────────────────
 router.post('/upload', protect, resumeUpload.single('resume'), async (req, res) => {
@@ -60,22 +44,13 @@ router.post('/upload', protect, resumeUpload.single('resume'), async (req, res) 
             return res.json(response);
         }
 
-        // 4. Upload to S3
-        const { key, url } = await uploadBufferToS3(
-            req.file.buffer,
-            req.file.mimetype,
-            req.file.originalname,
-            req.user._id
-        );
-
-        // 5. Save to MongoDB
+        // 4. Save to MongoDB (no S3 upload — file processed in memory only)
         const newResume = new Resume({
             user: req.user._id,
             originalName: req.file.originalname,
             resumeText: text,
             contentHash: hash,
-            s3Key: key,
-            fileUrl: url,
+            // s3Key and fileUrl intentionally omitted — no external file storage
         });
         await newResume.save();
 
@@ -83,7 +58,7 @@ router.post('/upload', protect, resumeUpload.single('resume'), async (req, res) 
             user: req.user._id,
             userName: req.user.name,
             action: 'RESUME_UPLOAD',
-            details: { fileName: req.file.originalname, s3Key: key },
+            details: { fileName: req.file.originalname },
             ip: req.ip
         });
 
@@ -184,11 +159,7 @@ router.delete('/:id', protect, async (req, res) => {
         const resume = await Resume.findOneAndDelete({ _id: req.params.id, user: req.user._id });
         if (!resume) return res.status(404).json({ message: 'Resume not found' });
 
-        // Delete from S3 if a key exists
-        if (resume.s3Key) {
-            await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: resume.s3Key }))
-                .catch(err => console.error('S3 delete failed (non-fatal):', err));
-        }
+        // S3 deletion removed — no external file storage
 
         await ActivityLog.create({
             user: req.user._id,

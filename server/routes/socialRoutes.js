@@ -1,25 +1,15 @@
 import express from 'express';
 import multer from 'multer';
-import multerS3 from 'multer-s3';
 import path from 'path';
-import { DeleteObjectsCommand } from '@aws-sdk/client-s3';
-import s3, { BUCKET } from '../config/s3.js';
+// AWS S3 imports removed — no longer using S3 for file storage
 import { protect } from '../middleware/authMiddleware.js';
 import SocialPost from '../models/SocialPost.js';
 
 const router = express.Router();
 
-// multer-s3: stream social media directly to S3 under "social/" prefix
+// Memory storage: files processed in memory, stored as base64 data URLs
 const upload = multer({
-    storage: multerS3({
-        s3,
-        bucket: BUCKET,
-        key: (req, file, cb) => {
-            const ext = path.extname(file.originalname);
-            cb(null, `social/${req.user._id}/${Date.now()}${ext}`);
-        },
-        contentType: multerS3.AUTO_CONTENT_TYPE,
-    }),
+    storage: multer.memoryStorage(),
     limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
     fileFilter: (req, file, cb) => {
         const allowed = /jpeg|jpg|png|gif|webp|mp4|mov|avi|webm/;
@@ -56,10 +46,10 @@ router.get('/feed', protect, async (req, res) => {
 router.post('/post', protect, upload.array('media', 10), async (req, res) => {
     try {
         const { content, type, jobDetails } = req.body;
-        // multer-s3 gives us location (public URL) and key directly on each file
+        // Convert uploaded files to base64 data URLs
         const media = (req.files || []).map(f => ({
-            url: f.location,   // S3 public URL
-            key: f.key,        // for deletion later
+            url: `data:${f.mimetype};base64,${f.buffer.toString('base64')}`,
+            key: `${Date.now()}-${f.originalname}`,  // identifier only, no S3 key
             mimetype: f.mimetype
         }));
 

@@ -8,7 +8,7 @@ import fs from 'fs';
  * Extract text from a file.
  * Supports both:
  *  - Disk storage: file has a `path` property (legacy / local fallback)
- *  - Memory storage: file has a `buffer` property (used when uploading to S3)
+ *  - Memory storage: file has a `buffer` property (used for in-memory processing)
  */
 export const extractText = async (file) => {
     try {

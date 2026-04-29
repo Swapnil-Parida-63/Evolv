@@ -9,9 +9,9 @@ const resumeSchema = new mongoose.Schema({
     jobReadinessScore: { type: Number, default: 0 },
     analysisResult: { type: mongoose.Schema.Types.Mixed },
 
-    // S3 storage
-    s3Key: { type: String },  // e.g. "resumes/<userId>/<filename>"
-    fileUrl: { type: String },  // public (or presigned) URL to the file on S3
+    // File storage fields (kept for backwards compatibility, no longer actively used)
+    // s3Key: { type: String },
+    fileUrl: { type: String },
 
     roadmapProgress: [{
         skill: String,
