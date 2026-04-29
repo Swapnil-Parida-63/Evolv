@@ -57,6 +57,9 @@ app.use('/api/social', socialRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/users', userRoutes);
 
+// Health check
+app.get('/api', (req, res) => res.json({ status: 'Evolv API is running' }));
+
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
