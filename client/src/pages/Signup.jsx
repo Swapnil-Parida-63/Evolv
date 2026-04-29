@@ -164,7 +164,7 @@ const Signup = () => {
 
                             {/* Google Sign Up */}
                             <button
-                                onClick={() => { window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/google`; }}
+                                onClick={() => { window.location.href = `${import.meta.env.VITE_API_URL || ''}/api/auth/google`; }}
                                 style={{
                                     width: '100%', display: 'flex', alignItems: 'center',
                                     justifyContent: 'center', gap: '10px',
